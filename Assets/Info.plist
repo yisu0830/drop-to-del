@@ -3,21 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Little Del</string>
+	<string>Drop to Del</string>
 	<key>CFBundleExecutable</key>
-	<string>LittleDel</string>
+	<string>DropToDel</string>
 	<key>CFBundleIconFile</key>
 	<string>Shredder</string>
 	<key>CFBundleIdentifier</key>
 	<string>studio.sue.PaperShredder</string>
 	<key>CFBundleName</key>
-	<string>Little Del</string>
+	<string>Drop to Del</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>1.0.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 </dict>
