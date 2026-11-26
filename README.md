@@ -21,7 +21,7 @@ The release is ad hoc signed and has no Apple notarization. If macOS blocks the 
 On macOS 14 or later, install Xcode Command Line Tools and run:
 
 ```sh
-./Scripts/build.sh
+bash Scripts/build.sh
 ```
 
 The app and ZIP are written to `build/<architecture>/`. Set `ARCH=arm64` or `ARCH=x86_64` to select a target.
