@@ -34,7 +34,7 @@ final class DesktopPet:NSView {
         let m=NSMenu()
         m.addItem(withTitle:"选择项目…",action:#selector(pick),keyEquivalent:"").target=self
         m.addItem(.separator())
-        m.addItem(withTitle:"退出 Little Del",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q").target=NSApp
+        m.addItem(withTitle:"退出 Drop to Del",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q").target=NSApp
         menu=m
     }
     required init?(coder:NSCoder){fatalError()}
