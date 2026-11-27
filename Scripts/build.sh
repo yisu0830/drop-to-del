@@ -9,14 +9,15 @@ case "$arch" in
 esac
 
 output="$root/build/$arch"
-app="$output/Little Del.app"
+app="$output/Drop to Del.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 xcrun swiftc -O -parse-as-library -target "$arch-apple-macos14.0" \
   -module-cache-path "$output/module-cache" \
   -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
-  "$root"/源码/*.swift -o "$app/Contents/MacOS/LittleDel"
+  "$root"/源码/*.swift -o "$app/Contents/MacOS/DropToDel"
 cp "$root/Assets/Info.plist" "$app/Contents/Info.plist"
 cp "$root/Assets/Shredder.icns" "$app/Contents/Resources/Shredder.icns"
+cp "$root/Assets/PageTurn.wav" "$root/Assets/Shred.wav" "$app/Contents/Resources/"
 codesign --force --sign - "$app"
 codesign --verify --strict "$app"
-ditto -c -k --keepParent "$app" "$output/Little-Del-macOS-$arch.zip"
+ditto -c -k --keepParent "$app" "$output/Drop-to-Del-macOS-$arch.zip"

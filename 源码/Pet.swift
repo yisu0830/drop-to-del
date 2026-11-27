@@ -19,10 +19,12 @@ final class DesktopPet:NSView {
     var feedingChecklist = false { didSet { needsDisplay = true } }
     var busy = false { didSet { if oldValue != busy { restartAnimation() } } }
     var cutting = false { didSet { if oldValue != cutting { restartAnimation() } } }
+    var nodding = false { didSet { needsDisplay = true } }
     private var highlight = false { didSet { if oldValue != highlight { restartAnimation() } } }
     private var hovering = false { didSet { needsDisplay = true } }
     private var tracking: NSTrackingArea?
     private var timer: Timer?
+    var shredCycleStart = ProcessInfo.processInfo.systemUptime
     private var animationStart = ProcessInfo.processInfo.systemUptime
     private var mouseDownLocation: NSPoint?
     private var didDrag = false
@@ -34,7 +36,7 @@ final class DesktopPet:NSView {
         let m=NSMenu()
         m.addItem(withTitle:"选择项目…",action:#selector(pick),keyEquivalent:"").target=self
         m.addItem(.separator())
-        m.addItem(withTitle:"退出 Little Del",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q").target=NSApp
+        m.addItem(withTitle:"退出 Drop to Del",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q").target=NSApp
         menu=m
     }
     required init?(coder:NSCoder){fatalError()}
@@ -111,7 +113,7 @@ final class DesktopPet:NSView {
         let lidIsOpen = hoverOpensLid || highlight || busy
         let scannerActive = highlight || (busy && !cutting && !feedingChecklist && checklistPaper == nil)
         let lifted = !reducedMotion && !lidIsOpen && !checklistVisible && frame % 24 >= 10 && frame % 24 < 15
-        let lift: CGFloat = lifted ? -0.5 : 0
+        let lift: CGFloat = nodding && !reducedMotion ? 0.75 : (lifted ? -0.5 : 0)
 
         func pixel(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat, _ color: UInt32) {
             NSColor(srgbRed: CGFloat((color >> 16) & 255) / 255,
@@ -193,7 +195,7 @@ final class DesktopPet:NSView {
         pixel(23.5, 17, 0.5, 2, busy ? mint : gold)
 
         if cutting && feedingChecklist && !reducedMotion, let checklistPaper {
-            drawShreddedPaper(checklistPaper, elapsed: elapsed)
+            drawShreddedPaper(checklistPaper, elapsed: ProcessInfo.processInfo.systemUptime - shredCycleStart)
         }
     }
 
@@ -274,6 +276,7 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let resultSize = NSSize(width: 139, height: 254)
     var window: NSPanel!
     var results: NSPanel?
+    private var bubble: NSPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         window = NSPanel(contentRect: pet.bounds, styleMask: [.borderless, .nonactivatingPanel],
@@ -352,7 +355,7 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
         pet.checklistPaper = image
     }
 
-    private func beginFeed() {
+    private func beginFeed(onCut: @escaping () -> Void) {
         guard let results else { return }
         pet.feedingChecklist = true
         setParticleOverflow(DesktopPet.particleOverflow)
@@ -366,6 +369,7 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) { [weak self] in
             guard let self, pet.feedingChecklist else { return }
             pet.cutting = true
+            onCut()
         }
     }
 
@@ -391,7 +395,60 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
         pet.checklistVisible = false
     }
 
+    private func dismissBubble() {
+        guard let bubble else { return }
+        window.removeChildWindow(bubble)
+        bubble.orderOut(nil)
+        self.bubble = nil
+        pet.nodding = false
+    }
+
+    private func reportSuccess(_ summary: String) {
+        dismissBubble()
+        hideResults()
+        guard let screen = window.screen ?? NSScreen.main else { return }
+        let label = NSHostingView(rootView:
+            VStack(alignment: .leading, spacing: 3) {
+                Label(summary, systemImage: "checkmark.circle.fill").font(.headline.monospacedDigit())
+                Text("已移入废纸篓").font(.caption)
+            }
+            .foregroundStyle(Color(red: 0.08, green: 0.36, blue: 0.31))
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(Color(red: 0.99, green: 0.96, blue: 0.90))
+            .overlay { Rectangle().strokeBorder(Color.secondary) }
+        )
+        let size = label.fittingSize
+        let visible = screen.visibleFrame
+        let x = min(max(window.frame.midX - size.width / 2, visible.minX), visible.maxX - size.width)
+        let above = window.frame.maxY + 3
+        let y = above + size.height <= visible.maxY ? above : window.frame.minY - size.height - 3
+        let panel = NSPanel(contentRect: NSRect(origin: NSPoint(x: x, y: y), size: size),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.ignoresMouseEvents = true
+        panel.contentView = label
+        panel.level = .floating
+        let animated = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        panel.alphaValue = animated ? 0 : 1
+        bubble = panel
+        window.addChildWindow(panel, ordered: .above)
+        panel.orderFrontRegardless()
+        if animated {
+            pet.nodding = true
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.16
+                panel.animator().alphaValue = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self, weak panel] in
+                if self?.bubble === panel { self?.pet.nodding = false }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self, weak panel] in
+            if self?.bubble === panel { self?.dismissBubble() }
+        }
+    }
+
     private func present() {
+        dismissBubble()
         pet.checklistVisible = true
         results?.orderFrontRegardless()
         positionResults()
@@ -421,8 +478,12 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.hideResults()
         }, captureSheet: { [weak self] in
             self?.captureSheet()
-        }, beginFeed: { [weak self] in
-            self?.beginFeed()
+        }, beginFeed: { [weak self] onCut in
+            self?.beginFeed(onCut: onCut)
+        }, animateShredCycle: { [weak self] in
+            self?.pet.shredCycleStart = ProcessInfo.processInfo.systemUptime
+        }, reportSuccess: { [weak self] summary in
+            self?.reportSuccess(summary)
         }, endFeed: { [weak self] in
             self?.endFeed()
         }))

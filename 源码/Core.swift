@@ -35,7 +35,7 @@ enum Scan {
                     let documented = (try? String(contentsOf: note, encoding: .utf8))?.contains("过程检查：hyperframes-video/_work/") == true && parent.deletingLastPathComponent().lastPathComponent == "hyperframes-video"
                     rule = ("过程检查","检查截图、报告或导出日志；清理后无法回看这份记录。",documented)
                 } else if ["png","jpg","jpeg","webp"].contains(url.pathExtension.lowercased()), ["demo","screenshot","检查","自测","截图"].contains(where: { name.lowercased().contains($0) }) {
-                    rule = ("待确认图片","仅按名称发现，可能是正式素材。请在 Finder 查看后选择。",false)
+                    rule = ("待确认图片","仅按名称发现，可能是正式素材。可在 Finder 查看，取消勾选要保留的图片。",true)
                 }
                 if let (title, reason, auto) = rule {
                     var size = (a[.size] as? NSNumber)?.int64Value ?? 0
@@ -47,7 +47,7 @@ enum Scan {
                             if v.isRegularFile == true { size += Int64(v.fileSize ?? 0) }
                         }
                     }
-                    let trackedRisk = auto && name != ".DS_Store" && hasRepository(parent)
+                    let trackedRisk = auto && title == "过程检查" && hasRepository(parent)
                     rows.append(Item(url:url,title:title,reason:reason + (trackedRisk ? " 位于 Git 项目中，请确认。" : ""),root:root,bytes:size,stamp:a[.modificationDate] as! Date,inode:(a[.systemFileNumber] as! NSNumber).uint64Value,checked:auto && !trackedRisk))
                 } else if dir {
                     for child in try fm.contentsOfDirectory(at:url, includingPropertiesForKeys:nil) { visit(child) }

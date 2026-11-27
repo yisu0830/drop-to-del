@@ -10,12 +10,71 @@ private func fileSize(_ bytes: Int64) -> String {
     ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
 }
 
+private enum PanelSound: String {
+    case checklist = "PageTurn"
+    case success = "Glass"
+    case failure = "Basso"
+
+    func play(replacing current: inout NSSound?) {
+        current?.stop()
+        if let url = Bundle.main.url(forResource: rawValue, withExtension: "wav") {
+            current = NSSound(contentsOf: url, byReference: false)
+        } else {
+            current = NSSound(named: NSSound.Name(rawValue))
+        }
+        current?.volume = 0.32
+        current?.play()
+    }
+}
+
+// The main queue joins the filesystem result with the end of a complete shred cycle.
+private final class ShredPlayback {
+    private let sound = Bundle.main.url(forResource: "Shred", withExtension: "wav")
+        .flatMap { NSSound(contentsOf: $0, byReference: false) }
+    private var completion: (() -> Void)?
+    private let minimumCycle: TimeInterval
+
+    private let animateCycle: () -> Void
+
+    init(reducedMotion: Bool, animateCycle: @escaping () -> Void) {
+        self.animateCycle = animateCycle
+        minimumCycle = reducedMotion ? 0.25 : DesktopPet.paperFallDuration
+        sound?.volume = 0.85
+    }
+
+    func finishAfterCycle(_ action: @escaping () -> Void) {
+        completion = action
+    }
+
+    func playCycle() {
+        animateCycle()
+        sound?.currentTime = 0
+        let playing = sound?.play() == true
+        let duration = max(minimumCycle, playing ? sound?.duration ?? 0 : 0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { self.endCycle() }
+    }
+
+    private func endCycle() {
+        if sound?.isPlaying == true {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { self.endCycle() }
+        } else if let action = completion {
+            completion = nil
+            action()
+        } else {
+            playCycle()
+        }
+    }
+}
+
 struct Panel:View {
+    @State private var currentSound: NSSound?
     let initial:URL
     let petState: (Bool, Bool) -> Void
     let hide: () -> Void
     let captureSheet: () -> Void
-    let beginFeed: () -> Void
+    let beginFeed: (@escaping () -> Void) -> Void
+    let animateShredCycle: () -> Void
+    let reportSuccess: (String) -> Void
     let endFeed: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var feeding = false
@@ -26,6 +85,7 @@ struct Panel:View {
     @State private var cleanupFailures: [String: String] = [:]
     @State var root:URL?
     @State var busy=false
+    @State private var completed = false
     @State var status="正在扫描…"
     var scanningApplication: Bool { Scan.isApplication(initial) }
     var chosen:[Item]{rows.filter{$0.checked}}
@@ -34,6 +94,7 @@ struct Panel:View {
         withAnimation(reduceMotion ? nil : .easeIn(duration: 0.18)) { unfolded = false }
         busy = true
         petState(true, false)
+        completed = false
         root = url
         rows = []
         cleanupFailures = [:]
@@ -43,6 +104,7 @@ struct Panel:View {
         DispatchQueue.global(qos:.userInitiated).async {
             let (found,missed)=Scan.run(url)
             DispatchQueue.main.asyncAfter(deadline: max(.now(), revealTime)) {
+                PanelSound.checklist.play(replacing: &currentSound)
                 rows = found
                 if scanningApplication { expanded = Set(found.map(\.title)) }
                 busy = false
@@ -57,18 +119,21 @@ struct Panel:View {
         let batch=chosen
         guard !busy && !batch.isEmpty else { return }
         if !reduceMotion { captureSheet() }
+        completed = false
         busy = true
+        currentSound?.stop()
+        let playback = ShredPlayback(reducedMotion: reduceMotion, animateCycle: animateShredCycle)
         petState(true, reduceMotion)
         if reduceMotion {
+            playback.playCycle()
             withAnimation(.easeOut(duration: 0.2)) { feeding = true }
         } else {
             withAnimation(.easeInOut(duration: 0.32)) { feeding = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
-                beginFeed()
+                beginFeed { playback.playCycle() }
                 withAnimation(.linear(duration: 0.48).delay(0.22)) { sliding = true }
             }
         }
-        let animationEnd = DispatchTime.now() + (reduceMotion ? 0.25 : 0.56 + DesktopPet.paperFallDuration)
         DispatchQueue.global(qos: .userInitiated).async {
             var done = Set<String>()
             var failures = [(item: Item, message: String)]()
@@ -86,36 +151,43 @@ struct Panel:View {
                     failures.append((item, message))
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: max(.now(), animationEnd)) {
-                if failures.isEmpty { hide() }
-                endFeed()
-                rows.removeAll { done.contains($0.id) }
-                for id in done { cleanupFailures.removeValue(forKey: id) }
-                for failure in failures {
-                    cleanupFailures[failure.item.id] = failure.message
-                    expanded.insert(failure.item.title)
-                }
-                busy = false
-                status = "已将 \(done.count) 项移到废纸篓"
-                if !failures.isEmpty { status += " · \(failures.count) 项失败" }
-                petState(false, false)
-                withAnimation(failures.isEmpty ? nil : .easeOut(duration: 0.2)) {
-                    feeding = false
-                    sliding = false
-                }
-                if !failures.isEmpty {
-                    let alert = NSAlert()
-                    alert.messageText = done.isEmpty ? "所选项目未能移入废纸篓" : "部分项目未能移入废纸篓"
-                    alert.informativeText = failures.prefix(6).map {
-                        $0.item.url.lastPathComponent + " · " + $0.message
-                    }.joined(separator: "\n")
-                    if hasPermissionFailure {
-                        alert.informativeText += "\n\n如果 macOS 提示授权，允许后可重试。也可以在 Finder 中定位并尝试手动移入废纸篓。"
+            DispatchQueue.main.async {
+                playback.finishAfterCycle {
+                    let cue: PanelSound = failures.isEmpty ? .success : .failure
+                    cue.play(replacing: &currentSound)
+                    completed = failures.isEmpty
+                    endFeed()
+                    rows.removeAll { done.contains($0.id) }
+                    for id in done { cleanupFailures.removeValue(forKey: id) }
+                    for failure in failures {
+                        cleanupFailures[failure.item.id] = failure.message
+                        expanded.insert(failure.item.title)
                     }
-                    alert.addButton(withTitle: "关闭")
-                    alert.addButton(withTitle: "在 Finder 中查看")
-                    if alert.runModal() == .alertSecondButtonReturn {
-                        NSWorkspace.shared.activateFileViewerSelecting(failures.map(\.item.url))
+                    busy = false
+                    let bytes = batch.filter { done.contains($0.id) }.reduce(Int64(0)) { $0 + $1.bytes }
+                    let summary = "\(done.count) 项 · \(fileSize(bytes))"
+                    status = summary + " 已移入废纸篓"
+                    if failures.isEmpty { reportSuccess(summary) }
+                    if !failures.isEmpty { status += " · \(failures.count) 项失败" }
+                    petState(false, false)
+                    withAnimation(failures.isEmpty ? nil : .easeOut(duration: 0.2)) {
+                        feeding = false
+                        sliding = false
+                    }
+                    if !failures.isEmpty {
+                        let alert = NSAlert()
+                        alert.messageText = done.isEmpty ? "所选项目未能移入废纸篓" : "部分项目未能移入废纸篓"
+                        alert.informativeText = failures.prefix(6).map {
+                            $0.item.url.lastPathComponent + " · " + $0.message
+                        }.joined(separator: "\n")
+                        if hasPermissionFailure {
+                            alert.informativeText += "\n\n如果 macOS 提示授权，允许后可重试。也可以在 Finder 中定位并尝试手动移入废纸篓。"
+                        }
+                        alert.addButton(withTitle: "关闭")
+                        alert.addButton(withTitle: "在 Finder 中查看")
+                        if alert.runModal() == .alertSecondButtonReturn {
+                            NSWorkspace.shared.activateFileViewerSelecting(failures.map(\.item.url))
+                        }
                     }
                 }
             }
@@ -219,17 +291,22 @@ struct Panel:View {
             .foregroundStyle(paper)
             Text(initial.lastPathComponent).font(.subheadline.weight(.semibold))
                 .lineLimit(1).truncationMode(.middle).help(initial.path)
+            if completed {
+                Label("清理完成", systemImage: "checkmark.circle.fill")
+                    .font(.headline).foregroundStyle(mint)
+            }
             Text(status).font(.caption).foregroundStyle(mint)
             Rectangle().fill(mint).frame(height: 2)
 
             if rows.isEmpty {
                 Spacer(minLength: 0)
             } else {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         ForEach(Array(Set(rows.map(\.title))).sorted(), id: \.self) { group($0) }
                     }
-                }.disabled(busy)
+                    .containerRelativeFrame(.horizontal)
+                }.clipped().disabled(busy)
             }
 
             HStack(spacing: 3) {
@@ -248,7 +325,7 @@ struct Panel:View {
                     actionLabel("重新扫描", fill: rule.opacity(0.62), enabled: canRescan)
                 }.buttonStyle(.plain).disabled(!canRescan)
                 Button(action: clean) {
-                    actionLabel(retrying ? "重试所选项" : "移到废纸篓", fill: gold, enabled: canClean)
+                    actionLabel(retrying ? "重试所选项" : "一键清理", fill: gold, enabled: canClean)
                 }.buttonStyle(.plain).disabled(!canClean)
             }
         }
