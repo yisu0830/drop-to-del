@@ -1,21 +1,16 @@
-MIT License
+Drop to Del 个人非商业使用许可
+Drop to Del Personal Noncommercial Use License
 
 Copyright (c) 2026 Little Del contributors
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+著作权人免费许可自然人仅为本人的私人、非商业目的下载、安装、运行、备份和修改本软件。此许可涵盖以本许可发布的项目代码、程序和文档。请在副本中保留版权声明和本许可。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+任何商业用途均须事先获得著作权人的书面许可，包括销售本软件、将其用于经营活动、为客户提供服务或集成到商业产品中。本许可仅授予个人使用权。其他权利由各著作权人保留。
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+本软件按现状提供。在适用法律允许的范围内，著作权人不提供担保，也不承担因使用本软件而产生的损失。第三方素材适用各自的许可，包括 Mixkit 提供的音效（https://mixkit.co/license/）。
+
+The copyright holders grant individuals permission, free of charge, to download, install, run, back up, and modify this software solely for their own private, noncommercial purposes. This license covers project code, programs, and documentation released under it. Retain the copyright notice and this license in copies.
+
+Any commercial use requires prior written permission from the copyright holders. This includes selling the software, using it in business operations, providing services to clients, or incorporating it into a commercial product. This license grants personal use rights only. Each copyright holder reserves all other rights.
+
+The software is provided as is. To the extent permitted by applicable law, the copyright holders disclaim warranties and liability for losses arising from its use. Third-party materials are governed by their respective licenses, including the sound effects supplied by Mixkit (https://mixkit.co/license/).

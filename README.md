@@ -63,7 +63,3 @@ Download the ZIP for your Mac from the [Releases page](https://github.com/yisu08
 发布版采用 ad hoc 签名，尚未经过 Apple 公证。如果 macOS 阻止首次启动，请在尝试打开后前往「系统设置 → 隐私与安全性」，查看是否有「仍要打开」选项。
 
 The release is ad hoc signed and has no Apple notarization. If macOS blocks the first launch, open **System Settings → Privacy & Security** after attempting to open the app and check for **Open Anyway**. The current interface is in Simplified Chinese.
-
-## 许可证 · License
-
-[MIT](LICENSE)
