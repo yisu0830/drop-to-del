@@ -64,20 +64,6 @@ Download the ZIP for your Mac from the [Releases page](https://github.com/yisu08
 
 The release is ad hoc signed and has no Apple notarization. If macOS blocks the first launch, open **System Settings → Privacy & Security** after attempting to open the app and check for **Open Anyway**. The current interface is in Simplified Chinese.
 
-## 从源码构建 · Build from source
-
-在 macOS 14 或更高版本上安装 Xcode 命令行工具，然后运行：
-
-On macOS 14 or later, install Xcode Command Line Tools and run:
-
-```sh
-bash Scripts/build.sh
-```
-
-构建好的应用和 ZIP 文件位于 `build/<architecture>/`。可通过 `ARCH=arm64` 或 `ARCH=x86_64` 指定目标架构。
-
-The app and ZIP are written to `build/<architecture>/`. Set `ARCH=arm64` or `ARCH=x86_64` to select a target.
-
 ## 许可证 · License
 
 [MIT](LICENSE)
